@@ -561,10 +561,10 @@ footer { background: var(--black); color: var(--off-white); padding: 5rem 3rem 2
     <!-- Success state (replaces form wrap) -->
     <div class="co-success" id="coSuccess">
       <div class="co-success-icon">✅</div>
-      <div class="co-success-title">Commande envoyée !</div>
+      <div class="co-success-title">Order Placed!</div>
       <div class="co-success-order" id="coSuccessOrder">#0000</div>
-      <div class="co-success-msg">Merci ! Nous allons confirmer votre commande par téléphone très bientôt. 💕</div>
-      <button class="co-done-btn" onclick="closeCheckout()">Continuer mes achats</button>
+      <div class="co-success-msg">Thank you! We'll confirm your order soon by phone. 💕</div>
+      <button class="co-done-btn" onclick="closeCheckout()">Continue Shopping</button>
     </div>
 
   </div>
@@ -736,23 +736,7 @@ function openCheckout() {
   document.getElementById('coVeil').classList.add('open');
 }
 
-function closeCheckout() {
-  document.getElementById('coVeil').classList.remove('open');
-  // Reset form for next order
-  setTimeout(() => {
-    document.getElementById('coFormWrap').style.display = 'flex';
-    document.getElementById('coSuccess').classList.remove('show');
-    document.getElementById('coError').classList.remove('show');
-    document.getElementById('coSubmit').classList.remove('loading');
-    document.getElementById('coSubmit').disabled = false;
-    ['coName','coPhone','coCity','coAddress','coNote'].forEach(id => {
-      const el = document.getElementById(id);
-      if(el) el.value = '';
-    });
-    document.getElementById('coWilaya').value = '';
-    selectDelivery('home');
-  }, 400);
-}
+function closeCheckout() { document.getElementById('coVeil').classList.remove('open'); }
 document.getElementById('coVeil').addEventListener('click', e => { if(e.target===e.currentTarget) closeCheckout(); });
 
 function selectDelivery(mode) {
@@ -761,7 +745,7 @@ function selectDelivery(mode) {
   document.getElementById('dStop').classList.toggle('selected', mode==='stop');
 }
 
-function submitOrder() {
+async function submitOrder() {
   // Validate
   const name    = document.getElementById('coName').value.trim();
   const phone   = document.getElementById('coPhone').value.trim();
@@ -772,12 +756,12 @@ function submitOrder() {
   const errEl   = document.getElementById('coError');
 
   if(!name || !phone || !wilaya || !city) {
-    errEl.textContent = 'Veuillez remplir tous les champs obligatoires (*)';
+    errEl.textContent = 'Please fill in all required fields (*)';
     errEl.classList.add('show');
     return;
   }
   if(phone.replace(/\D/g,'').length < 9) {
-    errEl.textContent = 'Numéro de téléphone invalide (ex: 0555123456)';
+    errEl.textContent = 'Please enter a valid phone number';
     errEl.classList.add('show');
     return;
   }
@@ -788,64 +772,71 @@ function submitOrder() {
   btn.classList.add('loading');
   btn.disabled = true;
 
-  // Build payload — matching to7fa Apps Script _handleWebOrder expectations
+  // Build payload
   const payload = {
     action:   'addorder',
-    name,
-    phone,
-    wilaya,
-    city,
-    address,
-    note,
+    name, phone, wilaya, city, address, note,
     delivery,
     items: cart.map(it => ({ name: it.name, qty: it.qty, price: it.price, category: it.category }))
   };
 
-  // Save local backup first (in case the POST fails)
   try {
-    const pending = JSON.parse(localStorage.getItem('to7fa_pending_orders') || '[]');
-    pending.push({ ...payload, savedAt: new Date().toISOString() });
-    localStorage.setItem('to7fa_pending_orders', JSON.stringify(pending.slice(-50)));
-  } catch(e) { /* ignore */ }
+    const res  = await fetch(SHEET_URL, {
+      method:  'POST',
+      body:    JSON.stringify(payload),
+      headers: { 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
 
-  // ── Fire-and-forget POST using text/plain + no-cors ──────────────────────
-  // Google Apps Script does NOT support application/json with preflight (CORS).
-  // We must use Content-Type: text/plain so the browser sends a simple request
-  // with no preflight. The Apps Script doPost() receives it as postData.contents.
-  // We show success immediately — the order is already saved in localStorage.
-  // ────────────────────────────────────────────────────────────────────────────
-  const body = JSON.stringify(payload);
+    if(data.ok) {
+      // Success!
+      document.getElementById('coFormWrap').style.display = 'none';
+      document.getElementById('coSuccessOrder').textContent = data.order || '';
+      document.getElementById('coSuccess').classList.add('show');
+      // Clear cart
+      cart = [];
+      updateCart();
+    } else {
+      throw new Error(data.error || 'Something went wrong');
+    }
+  } catch(err) {
+    errEl.textContent = 'Error: ' + err.message + '. Please try again.';
+    errEl.classList.add('show');
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
+}
 
-  function sendBeaconFallback() {
+// ===================== INIT =====================
+renderProducts(products);
+</script>
+</body>
+</html>
+TF-8' });
+      sent = navigator.sendBeacon(SHEET_URL, blob);
+    }
+  } catch(e) { sent = false; }
+
+  if (!sent) {
+    // Fallback: fetch no-cors with keepalive
     try {
-      const blob = new Blob([body], { type: 'text/plain;charset=UTF-8' });
-      if (navigator.sendBeacon && navigator.sendBeacon(SHEET_URL, blob)) return;
-    } catch(e) {}
-    // Last resort: fetch no-cors
-    fetch(SHEET_URL, {
-      method: 'POST',
-      mode: 'no-cors',
-      keepalive: true,
-      headers: { 'Content-Type': 'text/plain' },
-      body
-    }).catch(() => {});
+      fetch(SHEET_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        keepalive: true,
+        headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
+        body: body
+      }).catch(() => {});
+    } catch(e) { console.warn('Order POST failed:', e); }
   }
 
-  if (SHEET_URL && SHEET_URL.indexOf('PASTE_YOUR') === -1) {
-    sendBeaconFallback();
-  } else {
-    console.warn('⚠️ SHEET_URL not configured. Order saved to localStorage only.');
-    console.log('Payload:', payload);
-  }
-
-  // Show success immediately (fire-and-forget — we can't read no-cors responses)
+  // Show success immediately (we can't read no-cors responses anyway)
   document.getElementById('coFormWrap').style.display = 'none';
-  // Generate a local order reference so the customer sees something
   const localRef = '#' + Date.now().toString().slice(-5);
   document.getElementById('coSuccessOrder').textContent = localRef;
   document.getElementById('coSuccess').classList.add('show');
 
-  // Reset
+  // Reset cart
   cart = [];
   updateCart();
   btn.classList.remove('loading');
