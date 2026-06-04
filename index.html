@@ -488,6 +488,11 @@ footer { background: var(--black); color: var(--off-white); padding: 5rem 3rem 2
 
       <div class="co-error" id="coError"></div>
 
+      <!-- Honeypot: real users never fill this -->
+      <div style="position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none" aria-hidden="true">
+        <label>Website<input type="text" id="coHoney" tabindex="-1" autocomplete="off"></label>
+      </div>
+
       <div class="co-field">
         <label>Full Name *</label>
         <input type="text" id="coName" placeholder="Fatima Zahra..." autocomplete="name">
@@ -499,33 +504,11 @@ footer { background: var(--black); color: var(--off-white); padding: 5rem 3rem 2
       <div class="co-row2">
         <div class="co-field">
           <label>Wilaya *</label>
-          <select id="coWilaya">
-            <option value="">— Choose —</option>
-            <option>Adrar</option><option>Chlef</option><option>Laghouat</option>
-            <option>Oum El Bouaghi</option><option>Batna</option><option>Béjaïa</option>
-            <option>Biskra</option><option>Béchar</option><option>Blida</option>
-            <option>Bouira</option><option>Tamanrasset</option><option>Tébessa</option>
-            <option>Tlemcen</option><option>Tiaret</option><option>Tizi Ouzou</option>
-            <option>Alger</option><option>Djelfa</option><option>Jijel</option>
-            <option>Sétif</option><option>Saïda</option><option>Skikda</option>
-            <option>Sidi Bel Abbès</option><option>Annaba</option><option>Guelma</option>
-            <option>Constantine</option><option>Médéa</option><option>Mostaganem</option>
-            <option>M'Sila</option><option>Mascara</option><option>Ouargla</option>
-            <option>Oran</option><option>El Bayadh</option><option>Illizi</option>
-            <option>Bordj Bou Arréridj</option><option>Boumerdès</option><option>El Tarf</option>
-            <option>Tindouf</option><option>Tissemsilt</option><option>El Oued</option>
-            <option>Khenchela</option><option>Souk Ahras</option><option>Tipaza</option>
-            <option>Mila</option><option>Aïn Defla</option><option>Naâma</option>
-            <option>Aïn Témouchent</option><option>Ghardaïa</option><option>Relizane</option>
-            <option>Timimoun</option><option>Bordj Badji Mokhtar</option>
-            <option>Ouled Djellal</option><option>Béni Abbès</option><option>In Salah</option>
-            <option>In Guezzam</option><option>Touggourt</option><option>Djanet</option>
-            <option>El M'Ghair</option><option>El Meniaa</option>
-          </select>
+          <select id="coWilaya"><option value="">— Choose wilaya —</option></select>
         </div>
         <div class="co-field">
-          <label>Commune / City *</label>
-          <input type="text" id="coCity" placeholder="Ex: Bab Ezzouar">
+          <label>Commune *</label>
+          <select id="coCity" disabled><option value="">Choose wilaya first</option></select>
         </div>
       </div>
       <div class="co-field">
@@ -587,6 +570,119 @@ const products = [
 ];
 
 let cart = [];
+let formOpenedAt = 0;
+
+// ===================== WILAYAS + COMMUNES =====================
+const wilayas = [
+  {code:"01",name:"Adrar"},{code:"02",name:"Chlef"},{code:"03",name:"Laghouat"},{code:"04",name:"Oum El Bouaghi"},
+  {code:"05",name:"Batna"},{code:"06",name:"Béjaïa"},{code:"07",name:"Biskra"},{code:"08",name:"Béchar"},
+  {code:"09",name:"Blida"},{code:"10",name:"Bouira"},{code:"11",name:"Tamanrasset"},{code:"12",name:"Tébessa"},
+  {code:"13",name:"Tlemcen"},{code:"14",name:"Tiaret"},{code:"15",name:"Tizi Ouzou"},{code:"16",name:"Alger"},
+  {code:"17",name:"Djelfa"},{code:"18",name:"Jijel"},{code:"19",name:"Sétif"},{code:"20",name:"Saïda"},
+  {code:"21",name:"Skikda"},{code:"22",name:"Sidi Bel Abbès"},{code:"23",name:"Annaba"},{code:"24",name:"Guelma"},
+  {code:"25",name:"Constantine"},{code:"26",name:"Médéa"},{code:"27",name:"Mostaganem"},{code:"28",name:"M'Sila"},
+  {code:"29",name:"Mascara"},{code:"30",name:"Ouargla"},{code:"31",name:"Oran"},{code:"32",name:"El Bayadh"},
+  {code:"33",name:"Illizi"},{code:"34",name:"Bordj Bou Arréridj"},{code:"35",name:"Boumerdès"},{code:"36",name:"El Tarf"},
+  {code:"37",name:"Tindouf"},{code:"38",name:"Tissemsilt"},{code:"39",name:"El Oued"},{code:"40",name:"Khenchela"},
+  {code:"41",name:"Souk Ahras"},{code:"42",name:"Tipaza"},{code:"43",name:"Mila"},{code:"44",name:"Aïn Defla"},
+  {code:"45",name:"Naâma"},{code:"46",name:"Aïn Témouchent"},{code:"47",name:"Ghardaïa"},{code:"48",name:"Relizane"},
+  {code:"49",name:"Timimoun"},{code:"50",name:"Bordj Badji Mokhtar"},{code:"51",name:"Ouled Djellal"},{code:"52",name:"Béni Abbès"},
+  {code:"53",name:"In Salah"},{code:"54",name:"In Guezzam"},{code:"55",name:"Touggourt"},{code:"56",name:"Djanet"},
+  {code:"57",name:"El M'Ghair"},{code:"58",name:"El Meniaa"}
+];
+
+const communesData = {
+  "01":["Adrar","Tamest","Charouine","Reggane","In Zghmir","Tit","Ksar Kaddour","Sali","Bouda","Timokten","Aougrout","Fenoughil","Tamentit","Zaouiet Kounta"],
+  "02":["Chlef","Tenes","Benairia","El Karimia","Taougrit","Beni Haoua","Sobha","Harchoun","Ouled Fares","Sidi Akkacha","Boukadir","Beni Rached","Talassa"],
+  "03":["Laghouat","Ksar El Hirane","Sidi Makhlouf","Hassi R'Mel","Aflou","El Ghicha","Oued Morra","Hassi Delaa","Tadjemout","Tadjrouna","Brida","El Assafia","Kheneg"],
+  "04":["Oum El Bouaghi","Ain Beida","Ain M'lila","F'Kirina","Ain Babouche","Ksar Sbahi","Dhalaa","Sigus","Ain Diss","Ain Kercha","Meskiana","Souk Naamane","Telerghma"],
+  "05":["Batna","Ghassira","Maafa","Merouana","Tazoult","N'Gaous","Seggana","Arris","Timgad","Ichmoul","Fesdis","Rahouia","Ain Yagout","Bouzina","Chemora"],
+  "06":["Bejaia","Amizour","Ferraoun","Taourirt Ighil","Chemini","Taskriout","Tamokra","Draa El Caid","Sidi Aich","El Kseur","Melbou","Akfadou","Toudja","Tifra","Souk El Tenine","Mekla","Boudjellil","Tazmalt"],
+  "07":["Biskra","Ouled Djellal","Sidi Okba","M'Chouneche","El Kantara","Ain Zaatout","Tolga","Zeribet El Oued","El Outaya","Branis","Djemorah","Ain Naga","Lioua","Lichana"],
+  "08":["Bechar","Meridja","Lahmar","Boukais","Mogheul","Abadla","Taghit","Beni Ounif","Kenadsa","Igli","El Ouata","Tabelbala","Ouled Khoudir","Kerzaz"],
+  "09":["Blida","Boufarik","Bougara","El Affroun","Oued El Alleug","Mouzaia","Meftah","Larbaa","Bouinan","Guerrouaou","Ain Romana","Soumaa","Bouarfa","Chiffa","Ouled Yaich"],
+  "10":["Bouira","Aïn Bessem","Bir Ghbalou","Lakhdaria","El Hachimia","Souk El Khemis","Kadiria","Haizer","Taghzout","M'Chedellah","Ridane","Maala","Aomar","Djebahia"],
+  "11":["Tamanrasset","Abalessa","Idles","Tazrouk","In Ghar","In Amguel","Foggaret Ezzaouia"],
+  "12":["Tebessa","Bir El Ater","Cheria","Stah Guentis","El Aouinet","Safsaf El Ouesra","Hammamet","Ain Zerga","Negrine","El Kouif","Morsott","Oum Ali","Ouenza","Ferkane"],
+  "13":["Tlemcen","Sebdou","Ghazaouet","Remchi","Beni Snous","Maghnia","Hennaya","Bensekrane","Ouled Mimoun","Ain Youcef","Bab El Assa","Chetouane","Fellaoucene","Ain Fezza","Marsa Ben M'Hidi"],
+  "14":["Tiaret","Medroussa","Ain Bouchekif","Sidi Ali Mellal","Ain Zair","Dahmouni","Rahouia","Sougueur","Mellakou","Ksar Chellala","Frenda","Takhemaret","Hamadia"],
+  "15":["Tizi Ouzou","Ain El Hammam","Larba Nath Irathen","Mekla","Beni Douala","Boghni","Draa El Mizan","Ouacif","Azeffoun","Tizi Ghenif","Iferhounene","Bouzguen","Yakouren","Freha","Tadmait","Aghribs","Ifigha"],
+  "16":["Alger Centre","Sidi M'Hamed","El Madania","Bab El Oued","Bologhine","Casbah","Oued Koriche","Bir Mourad Rais","El Biar","Bouzareah","Birkhadem","El Harrach","Baraki","Oued Smar","Bachdjerrah","Hussein Dey","Kouba","Bourouba","Dar El Beida","Bab Ezzouar","Ben Aknoun","Dely Ibrahim","Hammamet","Rais Hamidou","Djasr Kasentina","El Mouradia","Hydra","Mohammadia","Bordj El Kiffan","El Magharia","Beni Messous","Les Eucalyptus","Birtouta","Tessala El Merdja","Ouled Chebel","Sidi Moussa","Ain Taya","Bordj El Bahri","El Marsa","H'Raoua","Rouiba","Reghaia","Ain Benian","Staoueli","Zeralda","Mahelma","Rahmania","Souidania","Cheraga","Ouled Fayet","El Achour","Draria","Douera","Baba Hassen","Khraicia","Saoula"],
+  "17":["Djelfa","Messaad","Hassi Bahbah","Ain Maabed","Dar Chioukh","Sidi Ladjel","Charef","El Idrissia","Guettara","Birine","Ain El Ibel","Hassi El Euch"],
+  "18":["Jijel","Taher","El Aouana","Chekfa","Settara","El Milia","Sidi Maarouf","Erraguene","Ziama Mansouriah","El Kennar","Ghebala","Texenna","Djemaa Beni Habibi"],
+  "19":["Setif","El Eulma","Ain Arnat","Guidjel","Beni Aziz","Amoucha","Babor","Ain Oulmene","Bouandas","Hammam Guergour","Salah Bey","Bir El Arch","Maoklane","Boutaleb"],
+  "20":["Saida","Sidi Boubekeur","Ouled Brahim","Tircount","Ain Soltane","Ouled Khaled","Youb","Moulay Larbi","Maamora","Ain Hadjar","Hounet","Sidi Amar","Ain Sekhouna"],
+  "21":["Skikda","El Hadaik","Azzaba","Ben Azzouz","Collo","Tamalous","Filfila","Sidi Mezghiche","Ain Bouziane","Zerdezas","Ramdane Djamel","Oued Zitoun","Kanoua"],
+  "22":["Sidi Bel Abbes","Tessala","Sidi Brahim","Mostefa Ben Brahim","Telagh","Sidi Ali Boussidi","Sidi Lahcene","Tenira","Moulay Slissen","Mezaourou","Ain Tindamine","Tilmouni"],
+  "23":["Annaba","Seraidi","Berrahel","El Hadjar","El Bouni","Ain Berda","Chetaibi","Sidi Amar","Treat","Oued El Aneb","Eulma"],
+  "24":["Guelma","Hammam Debagh","Bouchegouf","Djeballah Khemissi","Ain Makhlouf","Oued Zenati","Bouati Mahmoud","Medjez Sfa","Hammam N'Bail","Boumahra Ahmed","Nechmaya","Khezara"],
+  "25":["Constantine","El Khroub","Hamma Bouziane","Ibn Ziad","Zighoud Youcef","Ain Abid","Messaoud Boudjriou","Beni Hamiden","Didouche Mourad","Draa Ben Khedda"],
+  "26":["Medea","Berrouaghia","Ouzera","El Omaria","Souagui","Ksar El Boukhari","Aziz","Chabounia","Tablat","Tamesguida","Benchicao","Seghouane","Boghar","Sidi Naamane"],
+  "27":["Mostaganem","Ain Nouicy","Hassi Mamach","Stidia","Ain Tedles","Sour","Mesra","Bouguirat","Kheir Eddine","Sidi Lakhdar","Mansourah","Ouled Boughalem","Djidiouia"],
+  "28":["M'Sila","Medjedel","Hammam Dhalaa","Ouled Derradj","Ain El Hadjel","Khoubana","Tarmount","Sidi Ameur","Maadid","Ain El Melh","Beni Ilmane","Djebel Messaad","Sidi M'Hamed"],
+  "29":["Mascara","Sig","Bou Henni","El Bordj","Mohammadia","Tighenif","Oued Taria","Ain Fekan","Hachem","Ghriss","Zahana","Hanacha","Maoussa","Oued El Abtal"],
+  "30":["Ouargla","Hassi Messaoud","N'Goussa","Rouissat","Ain Beida","El Borma","Tebesbest","Nezla","Sidi Slimane","Balidat Ameur","Taibet","Temacine","El Harihira","Megarine"],
+  "31":["Oran","Es Senia","Bir El Djir","Sidi Chami","Gdyel","Marsa","Boufatis","Ain El Turk","Arzew","Bethioua","Ain El Kerma","Hassi Ben Okba","Misserghin","Mers El Kebir","Oued Tlelat","Tafraoui","Bousfer","El Ancor"],
+  "32":["El Bayadh","Brezina","Rogassa","El Abiodh Sidi Cheikh","Ghassoul","Boualem","Chellala","Arbaouat","Sidi Slimane","Sidi Tifour","Kef El Ahmar","El Bnoud","Ain El Orak","Cheguig"],
+  "33":["Illizi","Djanet","Debdeb","Bordj Omar Driss","In Amenas","Bordj El Haouass"],
+  "34":["Bordj Bou Arreridj","Ras El Oued","Bordj Zemoura","Mansoura","El M'hir","Ben Daoud","El Achir","Ain Taghrout","Sidi Embarek","Belimour","Medjana","Teniet En Nasr","Djaafra","Tixter","Bir Kasdali"],
+  "35":["Boumerdes","Boudouaou","Bordj Menaiel","Issers","Naciria","Thenia","Dellys","Baghlia","Sidi Daoud","Khemis El Khechna","Chabet El Ameur","Taourga","Ouled Hedadj","Zemmouri"],
+  "36":["El Tarf","El Kala","Bouhadjar","Ben M'Hidi","El Aioun","Souarekh","Zerizer","Boutheldja","Ain El Assel","Berrihane","Lac des Oiseaux","Hammam Beni Salah","Asfour"],
+  "37":["Tindouf","Oum El Assel"],
+  "38":["Tissemsilt","Theniet El Had","Bordj Emir Abdelkader","Lardjem","Beni Chaib","Ammari","Ouled Bessam","Bordj Bounaama","Sidi Slimane","Melaab","Khemisti","Layoune","Youssoufia"],
+  "39":["El Oued","Robbah","Oued El Alenda","Beni Guecha","Nakhla","Guemar","Hamraia","Reguiba","Debila","Magrane","Mih Ouansa","Hassi Khalifa","Trifaoui","Taleb Larbi","Bayadha"],
+  "40":["Khenchela","Kais","El Hamma","Ain Touila","Taouzianat","Baghai","Chelia","Babar","Djellal","Ouled Rechache","M'Toussa","Bouhmama","El Oueldja","Remila"],
+  "41":["Souk Ahras","Sedrata","Haddada","Mechroha","Ain Soltane","Tiffech","Taoura","Zaarouria","Bir Bouhouche","Sidi Fredj","Oum El Adhaim","M'Daourouch"],
+  "42":["Tipaza","Hadjout","Sidi Amar","Gouraya","Cherchell","Damous","Menaceur","Fouka","Bou Ismail","Kolea","Attatba","Ahmar El Ain","Sidi Ghiles","Bou Haroun","Nador"],
+  "43":["Mila","Ferdjioua","Chelghab Laid","Tassadane Haddada","Teleghma","Oued Athmania","Tadjenanet","Grarem Gouga","Ahmed Rached","Rouached","Mihoub","Sidi Merouane","Ghebala"],
+  "44":["Ain Defla","Mekhatria","Bathia","Aïn Bouyahia","Tiberkanine","Khemis Miliana","Hoceinia","Rouina","Boumedfaa","Djemaa Ouled Cheikh","Tacheta Zegagha","Ain Soltane","El Attaf"],
+  "45":["Naama","Mecheria","Aïn Séfra","Tiout","Sfissifa","Moghrar","Djéniane Bourzeg","Kasdir","El Biodh","Ain Ben Khelil"],
+  "46":["Ain Temouchent","Hammam Bouhadjar","Aghlal","Ain El Arbaa","Beni Saf","Ouled Boudjemaa","Chentouf","Sidi Safi","Terga","Aoubellil","Ain Tolba","Sidi Ben Adda","Hassi El Ghella","Bou Zedjar"],
+  "47":["Ghardaia","El Meniaa","Berriane","Metlili","El Atteuf","Zelfana","Sebseb","Bounoura","Mansoura","Hassi Fehal","Dhayet Bendhahoua"],
+  "48":["Relizane","Bendaoud","Sidi M'Hamed Ben Ali","El H'Madna","Ain Tarik","Mediouna","Oued El Djemaa","Mazouna","Ramka","Matmar","Zemmoura","Sidi Khettab","Beni Dergoun","Sidi Lazreg"],
+  "49":["Timimoun","Ouled Said","Tinerkouk","Ksar Kaddour","Metarfa","Talmine","Charouine","Aougrout","Deldoul","Ksabi"],
+  "50":["Bordj Badji Mokhtar","Timiaouine"],
+  "51":["Ouled Djellal","Sidi Khaled","Ras El Miad","Besbes","Chaiba","Doucen","Beni Ikhlef"],
+  "52":["Beni Abbes","Tabelbala","Igli","Kerzaz","Ouled Khoudir","Tamtert","Timoudi","El Ouata"],
+  "53":["In Salah","In Ghar","Foggaret Ezzaouia"],
+  "54":["In Guezzam","Tin Zaouatine"],
+  "55":["Touggourt","Taibet","Temacine","Megarine","El Harihira","Balidat Ameur","M'Naguer","Benaceur","Sidi Slimane","Blidet Amor"],
+  "56":["Djanet","El Mihan","Bordj El Haouass"],
+  "57":["El M'Ghair","Oum Touyour","Sidi Khelil","Still","Djamaa","M'Rara","Sidi Amrane"],
+  "58":["El Meniaa","Hassi Fehal","Hassi Gara"]
+};
+
+// Populate wilaya dropdown on page load
+window.addEventListener('DOMContentLoaded', function() {
+  const wSel = document.getElementById('coWilaya');
+  if (!wSel) return;
+  wilayas.forEach(function(w) {
+    const o = document.createElement('option');
+    o.value = w.code;
+    o.textContent = w.code + ' — ' + w.name;
+    wSel.appendChild(o);
+  });
+  // Cascade: when wilaya changes, populate commune dropdown
+  wSel.addEventListener('change', function() {
+    const code = wSel.value;
+    const citySel = document.getElementById('coCity');
+    citySel.innerHTML = '';
+    if (!code) {
+      citySel.innerHTML = '<option value="">Choose wilaya first</option>';
+      citySel.disabled = true;
+      return;
+    }
+    const ph = document.createElement('option');
+    ph.value = ''; ph.textContent = '— Choose commune —';
+    citySel.appendChild(ph);
+    (communesData[code] || []).forEach(function(c) {
+      const o = document.createElement('option');
+      o.value = c; o.textContent = c;
+      citySel.appendChild(o);
+    });
+    citySel.disabled = false;
+  });
+});
 let delivery = 'home';
 
 // ===================== CURSOR =====================
