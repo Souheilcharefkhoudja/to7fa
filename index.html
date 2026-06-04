@@ -745,80 +745,73 @@ function selectDelivery(mode) {
   document.getElementById('dStop').classList.toggle('selected', mode==='stop');
 }
 
-async function submitOrder() {
-  // Validate
+// ===================== SUBMIT — PROVEN NUTSA PATTERN =====================
+function submitOrder() {
   const name    = document.getElementById('coName').value.trim();
   const phone   = document.getElementById('coPhone').value.trim();
-  const wilaya  = document.getElementById('coWilaya').value.trim();
+  const wilayaCode = document.getElementById('coWilaya').value.trim();
   const city    = document.getElementById('coCity').value.trim();
   const address = document.getElementById('coAddress').value.trim();
   const note    = document.getElementById('coNote').value.trim();
+  const honey   = document.getElementById('coHoney').value.trim();
   const errEl   = document.getElementById('coError');
 
-  if(!name || !phone || !wilaya || !city) {
-    errEl.textContent = 'Please fill in all required fields (*)';
-    errEl.classList.add('show');
+  // Honeypot + timing check (anti-bot, same as Nutsa)
+  const elapsed = Date.now() - formOpenedAt;
+  if (honey || (formOpenedAt > 0 && elapsed < 2000)) {
+    document.getElementById('coFormWrap').style.display = 'none';
+    document.getElementById('coSuccessOrder').textContent = '#' + Date.now().toString().slice(-5);
+    document.getElementById('coSuccess').classList.add('show');
     return;
   }
-  if(phone.replace(/\D/g,'').length < 9) {
-    errEl.textContent = 'Please enter a valid phone number';
-    errEl.classList.add('show');
-    return;
+
+  if(!name || !phone || !wilayaCode || !city) {
+    errEl.textContent = 'Veuillez remplir tous les champs obligatoires (*)';
+    errEl.classList.add('show'); return;
+  }
+  if(!/^0[5-7]\d{8}$/.test(phone.replace(/\s/g,''))) {
+    errEl.textContent = 'Numéro invalide (ex: 0555123456)';
+    errEl.classList.add('show'); return;
   }
   errEl.classList.remove('show');
 
-  // Loading state
   const btn = document.getElementById('coSubmit');
-  btn.classList.add('loading');
-  btn.disabled = true;
+  btn.classList.add('loading'); btn.disabled = true;
 
-  // Build payload
+  const wilayaName = wilayas.find(w => w.code === wilayaCode);
+  const wilayaDisplay = wilayaName ? (wilayaCode + ' — ' + wilayaName.name) : wilayaCode;
+
   const payload = {
-    action:   'addorder',
-    name, phone, wilaya, city, address, note,
+    source: "masterpiece-website",
+    name, phone,
+    wilaya:     wilayaDisplay,
+    wilayaName: wilayaDisplay,
+    city, baladia: city,
+    address, note, notes: note,
     delivery,
-    items: cart.map(it => ({ name: it.name, qty: it.qty, price: it.price, category: it.category }))
+    items: cart.map(it => ({ name: it.name, qty: it.qty, price: it.price, category: it.category })),
+    cart:  cart.map(it => ({ name: it.name, qty: it.qty, price: it.price, category: it.category })),
+    submittedAt: new Date().toISOString()
   };
 
+  // localStorage backup BEFORE sending
   try {
-    const res  = await fetch(SHEET_URL, {
-      method:  'POST',
-      body:    JSON.stringify(payload),
-      headers: { 'Content-Type': 'application/json' }
-    });
-    const data = await res.json();
+    const pending = JSON.parse(localStorage.getItem('to7fa_pending_orders') || '[]');
+    pending.push({ ...payload, savedAt: new Date().toISOString() });
+    localStorage.setItem('to7fa_pending_orders', JSON.stringify(pending.slice(-50)));
+  } catch(e) {}
 
-    if(data.ok) {
-      // Success!
-      document.getElementById('coFormWrap').style.display = 'none';
-      document.getElementById('coSuccessOrder').textContent = data.order || '';
-      document.getElementById('coSuccess').classList.add('show');
-      // Clear cart
-      cart = [];
-      updateCart();
-    } else {
-      throw new Error(data.error || 'Something went wrong');
-    }
-  } catch(err) {
-    errEl.textContent = 'Error: ' + err.message + '. Please try again.';
-    errEl.classList.add('show');
-    btn.classList.remove('loading');
-    btn.disabled = false;
-  }
-}
-
-// ===================== INIT =====================
-renderProducts(products);
-</script>
-</body>
-</html>
-TF-8' });
+  // ── PROVEN NUTSA PATTERN: sendBeacon → fallback to fetch no-cors ──
+  const body = JSON.stringify(payload);
+  let sent = false;
+  try {
+    if (navigator.sendBeacon) {
+      const blob = new Blob([body], { type: 'text/plain;charset=UTF-8' });
       sent = navigator.sendBeacon(SHEET_URL, blob);
     }
   } catch(e) { sent = false; }
 
   if (!sent) {
-    // Fallback: fetch no-cors with keepalive
     try {
       fetch(SHEET_URL, {
         method: 'POST',
@@ -826,17 +819,15 @@ TF-8' });
         keepalive: true,
         headers: { 'Content-Type': 'text/plain;charset=UTF-8' },
         body: body
-      }).catch(() => {});
-    } catch(e) { console.warn('Order POST failed:', e); }
+      }).catch(function(){ /* ignore — order is in localStorage */ });
+    } catch(e) {}
   }
 
-  // Show success immediately (we can't read no-cors responses anyway)
+  // Show success immediately (fire-and-forget)
   document.getElementById('coFormWrap').style.display = 'none';
-  const localRef = '#' + Date.now().toString().slice(-5);
-  document.getElementById('coSuccessOrder').textContent = localRef;
+  document.getElementById('coSuccessOrder').textContent = '#' + Date.now().toString().slice(-5);
   document.getElementById('coSuccess').classList.add('show');
 
-  // Reset cart
   cart = [];
   updateCart();
   btn.classList.remove('loading');
